@@ -174,16 +174,30 @@ public class Chat {
                         // TODO: Encrypt bytes here before sending them
                         byte[] keyCopy = Arrays.copyOf(key, 16);
                         System.out.println("Key copy:" + Arrays.toString(keyCopy));
-                        byte[][] states = {{0x0, 0x1, 0x2, 0x3},
-                                {0x4, 0x5, 0x6, 0x7},
-                                {0x8, 0x9, 0xA, 0xB},
-                                {0xC, 0xD, 0xE, 0xF}};
-                        byte[] example = {0x54, 0x68, 0x61, 0x74,
+                        /*byte[][] state = {{0x0, 0x4, 0x8, 0xC},
+                                {0x1, 0x5, 0x9, 0xD},
+                                {0x2, 0x6, 0xA, 0xE},
+                                {0x3, 0x7, 0xB, 0xF}};
+                         */
+
+                        //BASED ON AES EXAMPLE
+                        byte[] key = {0x54, 0x68, 0x61, 0x74,
                                 0x73, 0x20, 0x6D, 0x79,
                                 0x20, 0x4B, 0x75, 0x6E,
                                 0x67, 0x20, 0x46, 0x75};
+                        byte[] plaintext = {0x54, 0x77, 0x6F, 0x20,
+                                0x4F, 0x6E, 0x65, 0x20,
+                                0x4E, 0x69, 0x6E, 0x65,
+                                0x20, 0x54, 0x77, 0x6F};
+
+                        byte[][] ciphertext = encrypt(key, plaintext);
+                        for (int i = 0; i < ciphertext.length; ++i) {
+                            System.out.println(toHex(ciphertext[i]));
+                        }
+
+                        /* implemented in encrypt method
                         byte[][] roundKeys = new byte[11][16];
-                        roundKeys[0] = example;
+                        roundKeys[0] = key;
                         for(int i = 1; i <= roundKeys.length - 1; ++i) {
                             roundKeys[i] = getRoundKey(roundKeys[i - 1], i);
                         }
@@ -191,7 +205,28 @@ public class Chat {
                         for(int i = 0; i < roundKeys.length; ++i) {
                             System.out.println("RoundKey " + i + ": " + toHex(roundKeys[i]));
                         }
-
+                        byte[][] state = loadState(plaintext);
+                        state = addRoundKey(state, roundKeys[0]);
+                        System.out.println("New State matrix: ");
+                        for (int i = 0; i < state.length; ++i) {
+                            System.out.println(toHex(state[i]));
+                        }
+                        state = substitueBytes(state);
+                        System.out.println("New State matrix after substitution: ");
+                        for (int i = 0; i < state.length; ++i) {
+                            System.out.println(toHex(state[i]));
+                        }
+                        state = shiftRows(state);
+                        System.out.println("New State matrix after shift rows: ");
+                        for (int i = 0; i < state.length; ++i) {
+                            System.out.println(toHex(state[i]));
+                        }
+                        state = mixColumns(state);
+                        System.out.println("New State matrix after mix column: ");
+                        for (int i = 0; i < state.length; ++i) {
+                            System.out.println(toHex(state[i]));
+                        }
+                         */
 
 
                         netOut.writeObject(bytes);
@@ -228,7 +263,7 @@ public class Chat {
         byte [] one = Arrays.copyOfRange(previous, 4, 8);
         byte [] two = Arrays.copyOfRange(previous, 8, 12);
         byte [] three = Arrays.copyOfRange(previous, 12, 16);
-        System.out.println("Last 4 Bytes: " + toHex(three));
+        //System.out.println("Last 4 Bytes: " + toHex(three));
 
         //left shift
         byte[] temp = Arrays.copyOf(three, 4);
@@ -237,15 +272,15 @@ public class Chat {
             temp [i] = temp[i+1];
         }
         temp[temp.length-1] = last;
-        System.out.println("Circular Left Shift: " + toHex(temp));
+        //System.out.println("Circular Left Shift: " + toHex(temp));
 
         //sBox and rcon
         for (int i = 0; i < temp.length; ++ i) {
             temp[i] = (byte) sBox[temp[i] & 0xFF];
         }
-        System.out.println("After S-box: " + toHex(temp));
+        //System.out.println("After S-box: " + toHex(temp));
         temp[0] ^= (byte) rcon[round];
-        System.out.println("After RCON: " + toHex(temp));
+        //System.out.println("After RCON: " + toHex(temp));
 
         //XOR
         byte[] four = xorByteArrays(zero, temp);
@@ -257,8 +292,96 @@ public class Chat {
         System.arraycopy(five, 0, roundKey, 4, 4);
         System.arraycopy(six, 0, roundKey, 8, 4);
         System.arraycopy(seven, 0, roundKey, 12, 4);
-        System.out.println("Roundkey: " + toHex(roundKey));
+        //System.out.println("Roundkey: " + toHex(roundKey));
         return roundKey;
+    }
+    private byte[][] addRoundKey(byte[][] state, byte[] roundKey) {
+        byte[][] newState = new byte[4][4];
+        int index = 0;
+        for(int column = 0; column < state.length; ++column) {
+            for (int row = 0; row < state.length; ++row) {
+                newState[row][column] = (byte) (state[row][column] ^ roundKey[index++]);
+            }
+        }
+        return newState;
+    }
+
+    private byte[][] substituteBytes(byte[][] state) {
+        byte[][] newState = new byte[4][4];
+        for(int column = 0; column < state.length; ++column) {
+            for (int row = 0; row < state.length; ++row) {
+                newState[row][column] = (byte) sBox[state[row][column] & 0xFF];
+            }
+        }
+        return newState;
+    }
+
+    private byte[][] shiftRows(byte[][] state) {
+        byte[][] newState = new byte[4][4];
+        for (int row = 0; row < state.length; ++row) {
+            for(int column = 0; column < state.length; ++column) {
+                newState[row][column] = state[row][(column + row) % state.length];
+            }
+        }
+        return newState;
+    }
+
+
+    private  byte xTime(byte b) {
+        return (byte) (((b & 0x80) != 0) ? ((b<<1) ^ 0x1B) : (b << 1));
+    }
+
+    private byte[][] mixColumns (byte[][] state) {
+        byte[][] newState = new byte[4][4];
+        for (int i = 0; i < state.length; ++i) {
+            byte t = (byte) (state[0][i] ^ state[1][i] ^ state[2][i] ^ state[3][i]);
+            byte u = state[0][i];
+            newState[0][i] = (byte) (state[0][i] ^ t ^ xTime((byte) (state[0][i] ^ state[1][i])));
+            newState[1][i] = (byte) (state[1][i] ^ t ^ xTime((byte) (state[1][i] ^ state[2][i])));
+            newState[2][i] = (byte) (state[2][i] ^ t ^ xTime((byte) (state[2][i] ^ state[3][i])));
+            newState[3][i] = (byte) (state[3][i] ^ t ^ xTime((byte) (state[3][i] ^ u)));
+
+            /* could be shorten with no newState?
+            state[0][i] ^= (byte) (t ^ xtime((byte) (state[0][i] ^ state[1][i])));
+            state[1][i] ^= (byte) (t ^ xtime((byte) (state[1][i] ^ state[2][i])));
+            state[2][i] ^= (byte) (t ^ xtime((byte) (state[2][i] ^ state[3][i])));
+            state[3][i] ^= (byte) (t ^ xtime((byte) (state[3][i] ^ u)));
+             */
+        }
+        return newState;
+    }
+    private byte[][] loadState(byte[] plaintext) {
+        byte[][] state = new byte[4][4];
+        int index = 0;
+        for(int column = 0; column < state.length; ++column) {
+            for (int row = 0; row < state.length; ++row) {
+                state[row][column] = plaintext[index++];
+            }
+        }
+        return state;
+    }
+
+    private byte[][] encrypt(byte[] key, byte[] plaintext) {
+        byte[][] state = loadState(plaintext);
+        byte[][] roundKeys = new byte[11][16];
+        roundKeys[0] = key;
+        for (int i = 1; i <= roundKeys.length - 1; ++i) {
+            roundKeys[i] = getRoundKey(roundKeys[i - 1], i);
+        }
+        //initial round
+        state = addRoundKey(state, roundKeys[0]);
+        //normal rounds 1-9
+        for (int i = 1; i <=9; ++i){
+            state = substituteBytes(state);
+            state = shiftRows(state);
+            state = mixColumns(state);
+            state = addRoundKey(state, roundKeys[i]);
+        }
+        //final round
+        state = substituteBytes(state);
+        state = shiftRows(state);
+        state = addRoundKey(state, roundKeys[10]);
+        return state;
     }
 
     private class Receiver extends Thread {
