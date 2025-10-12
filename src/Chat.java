@@ -195,38 +195,6 @@ public class Chat {
                             System.out.println(toHex(ciphertext[i]));
                         }
 
-                        /* implemented in encrypt method
-                        byte[][] roundKeys = new byte[11][16];
-                        roundKeys[0] = key;
-                        for(int i = 1; i <= roundKeys.length - 1; ++i) {
-                            roundKeys[i] = getRoundKey(roundKeys[i - 1], i);
-                        }
-
-                        for(int i = 0; i < roundKeys.length; ++i) {
-                            System.out.println("RoundKey " + i + ": " + toHex(roundKeys[i]));
-                        }
-                        byte[][] state = loadState(plaintext);
-                        state = addRoundKey(state, roundKeys[0]);
-                        System.out.println("New State matrix: ");
-                        for (int i = 0; i < state.length; ++i) {
-                            System.out.println(toHex(state[i]));
-                        }
-                        state = substitueBytes(state);
-                        System.out.println("New State matrix after substitution: ");
-                        for (int i = 0; i < state.length; ++i) {
-                            System.out.println(toHex(state[i]));
-                        }
-                        state = shiftRows(state);
-                        System.out.println("New State matrix after shift rows: ");
-                        for (int i = 0; i < state.length; ++i) {
-                            System.out.println(toHex(state[i]));
-                        }
-                        state = mixColumns(state);
-                        System.out.println("New State matrix after mix column: ");
-                        for (int i = 0; i < state.length; ++i) {
-                            System.out.println(toHex(state[i]));
-                        }
-                         */
 
 
                         netOut.writeObject(bytes);
@@ -326,29 +294,53 @@ public class Chat {
         return newState;
     }
 
-
-    private  byte xTime(byte b) {
-        return (byte) (((b & 0x80) != 0) ? ((b<<1) ^ 0x1B) : (b << 1));
-    }
-
-    private byte[][] mixColumns (byte[][] state) {
+    private static byte[][] mixColumns(byte[][] state) {
         byte[][] newState = new byte[4][4];
-        for (int i = 0; i < state.length; ++i) {
-            byte t = (byte) (state[0][i] ^ state[1][i] ^ state[2][i] ^ state[3][i]);
-            byte u = state[0][i];
-            newState[0][i] = (byte) (state[0][i] ^ t ^ xTime((byte) (state[0][i] ^ state[1][i])));
-            newState[1][i] = (byte) (state[1][i] ^ t ^ xTime((byte) (state[1][i] ^ state[2][i])));
-            newState[2][i] = (byte) (state[2][i] ^ t ^ xTime((byte) (state[2][i] ^ state[3][i])));
-            newState[3][i] = (byte) (state[3][i] ^ t ^ xTime((byte) (state[3][i] ^ u)));
+        byte[] a = new byte[4];
+        for (int j = 0; j < state.length; ++j) {
+            for (int i = 0; i < state.length; ++i)
+                a[i] = state[i][j];
 
-            /* could be shorten with no newState?
-            state[0][i] ^= (byte) (t ^ xtime((byte) (state[0][i] ^ state[1][i])));
-            state[1][i] ^= (byte) (t ^ xtime((byte) (state[1][i] ^ state[2][i])));
-            state[2][i] ^= (byte) (t ^ xtime((byte) (state[2][i] ^ state[3][i])));
-            state[3][i] ^= (byte) (t ^ xtime((byte) (state[3][i] ^ u)));
-             */
+            newState[0][j] = (byte) (galoisMultiply(a[0],2) ^ galoisMultiply(a[1],3) ^ a[2] ^ a[3]);
+            newState[1][j] = (byte) (a[0] ^ galoisMultiply(a[1],2) ^ galoisMultiply(a[2],3) ^ a[3]);
+            newState[2][j] = (byte) (a[0] ^ a[1] ^ galoisMultiply(a[2],2) ^ galoisMultiply(a[3],3));
+            newState[3][j] = (byte) (galoisMultiply(a[0],3) ^ a[1] ^ a[2] ^ galoisMultiply(a[3],2));
         }
         return newState;
+    }
+
+    private static byte[][] inverseMixColumns(byte[][] state) {
+        byte[][] newState = new byte[4][4];
+        byte[] a = new byte[4];
+        for (int j = 0; j < state.length; ++j) {
+            for (int i = 0; i < state.length; ++i)
+                a[i] = state[i][j];
+
+            state[0][j] = (byte) (galoisMultiply(a[0],14) ^ galoisMultiply(a[3],9) ^ galoisMultiply(a[2],13) ^ galoisMultiply(a[1],11));
+            state[1][j] = (byte) (galoisMultiply(a[1],14) ^ galoisMultiply(a[0],9) ^ galoisMultiply(a[3],13) ^ galoisMultiply(a[2],11));
+            state[2][j] = (byte) (galoisMultiply(a[2],14) ^ galoisMultiply(a[1],9) ^ galoisMultiply(a[0],13) ^ galoisMultiply(a[3],11));
+            state[3][j] = (byte) (galoisMultiply(a[3],14) ^ galoisMultiply(a[2],9) ^ galoisMultiply(a[1],13) ^ galoisMultiply(a[0],11));
+        }
+        return newState;
+    }
+
+    private static byte galoisMultiply(int a, int b) {
+        int p = 0;
+        int highBit;
+
+        for (int i = 0; i < 8; ++i) {
+            if ((b & 1) == 1)
+                p ^= a;
+            highBit = a & 0x80;
+            a <<= 1;
+            if (highBit == 0x80)
+                a ^= 0x1b;
+            b >>= 1;
+        }
+
+        p &= 0xff;
+
+        return (byte)p;
     }
     private byte[][] loadState(byte[] plaintext) {
         byte[][] state = new byte[4][4];
