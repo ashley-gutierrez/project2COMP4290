@@ -1,7 +1,7 @@
+import javax.lang.model.type.NullType;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.lang.reflect.Array;
 import java.math.BigInteger;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -9,6 +9,8 @@ import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.Random;
 import java.util.Scanner;
+
+import static java.util.Arrays.copyOfRange;
 
 public class Chat {
     private Socket socket;
@@ -190,35 +192,15 @@ public class Chat {
                         byte[] bytes = line.getBytes();
                         // TODO: Encrypt bytes here before sending them
                         byte[] keyCopy = Arrays.copyOf(key, 16);
-                        System.out.println("Key copy:" + Arrays.toString(keyCopy));
-                        /*byte[][] state = {{0x0, 0x4, 0x8, 0xC},
-                                {0x1, 0x5, 0x9, 0xD},
-                                {0x2, 0x6, 0xA, 0xE},
-                                {0x3, 0x7, 0xB, 0xF}};
-                         */
-
-                        //BASED ON AES EXAMPLE
-                        byte[] key = {0x54, 0x68, 0x61, 0x74,
-                                0x73, 0x20, 0x6D, 0x79,
-                                0x20, 0x4B, 0x75, 0x6E,
-                                0x67, 0x20, 0x46, 0x75};
-                        byte[] plaintext = {0x54, 0x77, 0x6F, 0x20,
-                                0x4F, 0x6E, 0x65, 0x20,
-                                0x4E, 0x69, 0x6E, 0x65,
-                                0x20, 0x54, 0x77, 0x6F};
-                        System.out.println("The plaintext encrypted is:");
-                        byte[][] ciphertext = encrypt(key, plaintext);
-                        for (int i = 0; i < ciphertext.length; ++i) {
-                            System.out.println(toHex(ciphertext[i]));
-                        }
-                        System.out.println("The ciphertext decrypted is:");
-                        byte[][] decryptedText = decrypt(key, getByteArray(ciphertext));
-                        for (int i = 0; i < decryptedText.length; ++i) {
-                            System.out.println(toHex(decryptedText[i]));
-                        }
+                        byte[][] ciphertext;
+                        byte [] cipherBytes = new byte[bytes.length + (16 - bytes.length %16) ];
+                        for (int i = 0; i < cipherBytes.length; i +=16) {
+                            ciphertext = encrypt(keyCopy, copyOfRange(bytes,i,i+16));
+                            System.arraycopy(getByteArray(ciphertext),0,cipherBytes,i,16);
+                       }
 
 
-                        netOut.writeObject(bytes);
+                        netOut.writeObject(cipherBytes);
                         netOut.flush();
                     }
                 }
@@ -262,10 +244,10 @@ public class Chat {
 
     private static byte[] getRoundKey(byte[] previous, int round) {
         //splits key
-        byte [] zero = Arrays.copyOfRange(previous, 0, 4);
-        byte [] one = Arrays.copyOfRange(previous, 4, 8);
-        byte [] two = Arrays.copyOfRange(previous, 8, 12);
-        byte [] three = Arrays.copyOfRange(previous, 12, 16);
+        byte [] zero = copyOfRange(previous, 0, 4);
+        byte [] one = copyOfRange(previous, 4, 8);
+        byte [] two = copyOfRange(previous, 8, 12);
+        byte [] three = copyOfRange(previous, 12, 16);
         //System.out.println("Last 4 Bytes: " + toHex(three));
 
         //left shift
@@ -453,7 +435,22 @@ public class Chat {
                 while (!socket.isClosed()) {
                     byte[] bytes = (byte[])(netIn.readObject());
                     // TODO: Decrypt bytes here before reconstituting String
-                    String line = new String(bytes);
+                    byte[] keyCopy = Arrays.copyOf(key, 16);
+                    byte[][] decryptedText;
+                    byte[] decryptedBytes = new byte[bytes.length ];
+                    for (int i = 0; i < bytes.length; i+= 16) {
+                        decryptedText = decrypt(keyCopy, copyOfRange(bytes,i,i+16));
+                        System.arraycopy(getByteArray(decryptedText),0,decryptedBytes,i,16);
+                    }
+                    int index =0;
+                    while (index != -1) {
+                        if (decryptedBytes[index] == 0){
+                            decryptedBytes = copyOfRange(decryptedBytes,0,index);
+                            index = -2;
+                        }
+                        index++;
+                    }
+                    String line = new String(decryptedBytes);
                     System.out.println(line);
                 }
             } catch (IOException e) {
