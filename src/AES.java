@@ -289,7 +289,7 @@ public class AES {
      * @param plaintext, a 16 byte array
      * @return 2d 4x4 byte array in [column][row] format
      */
-    private static byte[][] loadState(byte[] plaintext) {//TODO
+    private static byte[][] loadState(byte[] plaintext) {
         byte[][] state = new byte[4][4];
         int index = 0;
         for (int column = 0; column < state.length; ++column) {
