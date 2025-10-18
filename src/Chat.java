@@ -93,7 +93,6 @@ public class Chat {
             try {
                 BigInteger publicB = (BigInteger) netIn.readObject();
                 sameSecretKey = publicB.modPow(privateA, P);
-                System.out.println("Client Secret Key: " + Arrays.toString(sameSecretKey.toByteArray()));
             } catch (ClassNotFoundException e) {
                 throw new RuntimeException(e);
             }
@@ -106,8 +105,6 @@ public class Chat {
             try {
                 BigInteger publicA = (BigInteger) netIn.readObject();
                 sameSecretKey = publicA.modPow(privateB, P);
-                System.out.println("Server Secret Key: " + Arrays.toString(sameSecretKey.toByteArray()));
-
             } catch (ClassNotFoundException e) {
                 throw new RuntimeException(e);
             }
