@@ -81,15 +81,15 @@ public class Chat {
         System.out.println("Running chat ...");
         System.out.println();
 
-        // TODO: Negotiate key using Diffie-Hellman here
+        // Negotiates key using Diffie-Hellman
         Random random = new Random();
         BigInteger sameSecretKey;
+        // creates key for client
         if (client) {
             BigInteger privateA = new BigInteger(LENGTH, random);
             BigInteger publicA = G.modPow(privateA, P);
             netOut.writeObject(publicA);
             netOut.flush();
-
             try {
                 BigInteger publicB = (BigInteger) netIn.readObject();
                 sameSecretKey = publicB.modPow(privateA, P);
@@ -98,6 +98,7 @@ public class Chat {
                 throw new RuntimeException(e);
             }
         } else {
+            // creates key for server
             BigInteger privateB = new BigInteger(LENGTH, random);
             BigInteger publicB = G.modPow(privateB, P);
             netOut.writeObject(publicB);
@@ -135,11 +136,10 @@ public class Chat {
                     } else {
                         String line = name + ": " + buffer;
                         byte[] bytes = line.getBytes();
-                        // TODO: Encrypt bytes here before sending them
+                        // creates copy of key
                         byte[] keyCopy = Arrays.copyOf(key, 16);
-
+                        //calls encrypt to encrypt plaintext, and store in cipherBytes
                         byte[] cipherBytes = AES.encrypt(bytes, keyCopy);
-
 
                         netOut.writeObject(cipherBytes);
                         netOut.flush();
@@ -162,8 +162,9 @@ public class Chat {
             try {
                 while (!socket.isClosed()) {
                     byte[] bytes = (byte[]) (netIn.readObject());
-                    // TODO: Decrypt bytes here before reconstituting String
+                    // makes key copy
                     byte[] keyCopy = Arrays.copyOf(key, 16);
+                    // decrypts encrypted byte array and stores it in decryptedBytes
                     byte[] decryptedBytes = AES.decrypt(bytes, keyCopy);
                     String line = new String(decryptedBytes);
                     System.out.println(line);
